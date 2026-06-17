@@ -9,6 +9,7 @@ import glob
 import shutil
 import rasterio
 import subprocess
+from typing import Union
 from dotenv import load_dotenv
 from rasterio.io import MemoryFile
 
@@ -40,9 +41,47 @@ def _retag_5070_lzw_inplace(tif_path: str) -> None:
 
 
 # Main module for the FIM execution
-def runfim(code_dir, output_dir, HUC_code, data_dir, depth=False):
+def runfim(
+    code_dir: str,
+    output_dir: str,
+    HUC_code: Union[str, int],
+    data_dir: str,
+    depth: bool = False,
+    label: str = "",
+):
+    """
+    The main module for executing the FIM process.
+    It sets up the environment, constructs the command
+    to run the mosaic inundation mapping, and handles
+    the output files.
+
+    Parameters
+    ----------
+    code_dir : str
+        The directory where the NOAA OWP flood-inundation mapping code is located.
+    output_dir : str
+        The directory where the output of the FIM process will be stored.
+    HUC_code : int
+        The input HUC code for which the FIM process will be executed.
+    data_dir : str
+        The directory where input data are located.
+    depth : bool, optional
+        Flag to indicate whether depth mapping should also be generated. Default is False.
+    label: str, optional
+        Parameter used to ensure that unique output directories are created to prevent the mosaic
+        process from merging outputs from parallel runs. Default is an empty string.
+
+
+    Returns
+    -------
+    None
+
+    """
+
     original_dir = os.getcwd()
     try:
+        # construct paths to the tools and source code,
+        # and set up the environment
         tools_path = os.path.join(code_dir, "tools")
         src_path = os.path.join(code_dir, "src")
         os.chdir(tools_path)
@@ -51,17 +90,22 @@ def runfim(code_dir, output_dir, HUC_code, data_dir, depth=False):
         sys.path.append(src_path)
         sys.path.append(code_dir)
 
+        # build paths to input and output data that
+        # are needed for the FIM process
         HUC_code = str(HUC_code)
         HUC_dir = os.path.join(output_dir, f"flood_{HUC_code}")
         csv_path = data_dir
 
+        # prepare the output directory for inundation mapping results
         discharge_basename = os.path.basename(data_dir).split(".")[0]
-        inundation_dir = os.path.join(HUC_dir, f"{HUC_code}_inundation")
+        inundation_dir = os.path.join(HUC_dir, f"{HUC_code}_inundation", label)
         temp_dir = os.path.join(inundation_dir, "temp")
 
         if not os.path.exists(temp_dir):
             os.makedirs(temp_dir)
 
+        # build the inundation mapping command which uses
+        # the mosiac wrapper script
         inundation_file = os.path.join(temp_dir, f"{discharge_basename}_inundation.tif")
         Command = [
             sys.executable,
@@ -76,6 +120,7 @@ def runfim(code_dir, output_dir, HUC_code, data_dir, depth=False):
             inundation_file,
         ]
 
+        # if depth mapping is requested, add the appropriate argument to the command
         if depth:
             depth_file = os.path.join(temp_dir, f"{discharge_basename}_depth.tif")
             Command += ["-d", depth_file]
@@ -85,6 +130,7 @@ def runfim(code_dir, output_dir, HUC_code, data_dir, depth=False):
         env = os.environ.copy()
         env["PYTHONPATH"] = f"{src_path}{os.pathsep}{code_dir}"
 
+        # execute the command and capture the output and errors
         result = subprocess.run(
             Command,
             cwd=tools_path,
