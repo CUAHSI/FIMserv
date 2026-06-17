@@ -2,10 +2,34 @@ import os
 import csv
 import pandas as pd
 import subprocess
+from typing import Union
 
 
-def setup_directories():
-    parent_dir = os.getcwd()
+def setup_directories(parent_dir: Union[str, None] = None) -> tuple[str, str, str]:
+    """
+    Prepares the necessary directory structure for the FIM process.
+    It creates directories for the code, data inputs, and outputs
+    if they do not already exist.
+
+    Parameters
+    ----------
+    parent_dir : str, optional
+        The root directory under which the code, data, and output directories will be created.
+        default is None, which means the current working directory will be used.
+
+    Returns
+    -------
+    directories: tuple[str, str, str]
+        A tuple containing the paths to the code directory, data directory,
+        and output directory in that order.
+
+    """
+
+    # set the parent directory to the current working directory if not provided
+    if parent_dir is None:
+        parent_dir = os.getcwd()
+
+    # build paths for code, data, and output directories
     code_dir = os.path.join(parent_dir, "code", "inundation-mapping")
     data_dir = os.path.join(parent_dir, "data", "inputs")
     output_dir = os.path.join(parent_dir, "output")
@@ -47,7 +71,27 @@ def clone_repository(code_dir, version=None):
     print(f"Repository cloned into: {repo_path} (version: {version_tag})")
 
 
-def download_data(huc_number, base_dir, version=None):
+def download_data(huc_number: str, base_dir: str, version=None) -> None:
+    """
+    Downloads the necessary data for a given HUC number from the specified S3 bucket
+
+    Parameters
+    ----------
+    huc_number : str
+        The identifier for the HUC region for which data is to be downloaded.
+    base_dir : str
+        The base directory where the downloaded data will be stored.
+        The function will create a subdirectory named "flood_{huc_number}"
+        within this base directory to store the data for the specific HUC.
+    version : str, optional
+        The version of the data to download. Supported versions are "4.5", "4.8", and "4.9".
+
+    Returns
+    -------
+    None
+
+    """
+
     output_dir = os.path.join(base_dir, f"flood_{huc_number}", str(huc_number))
     os.makedirs(output_dir, exist_ok=True)
 
